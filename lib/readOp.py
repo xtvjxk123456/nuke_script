@@ -4,6 +4,7 @@ import os
 import glob
 import shutil
 import logging
+import itertools
 from multiprocessing.dummy import Pool as ThreadPool
 
 import nuke
@@ -129,7 +130,7 @@ def main():
     for read in allRead:
         readName = read.name()
         files = get_read_files(readName)  # 获取复制文件
-        dataList = map(lambda x: (x, get_target_copy_path(x, )), files)  # 获取复制细节
+        dataList = itertools.starmap(get_target_copy_path, files)  # 获取复制细节.starmap用来解包参数
         copyResult = copy_thread_pool.map(lambda x: _copy_file(x[0], x[1]), dataList)  # 这一句不应该发生错误，否则报错内容不太好看,执行复制
         for data, result in zip(dataList, copyResult):
             logger.info("Read:{}:\n\t{}->{}:{}".format(readName, data[0], data[1], result))
