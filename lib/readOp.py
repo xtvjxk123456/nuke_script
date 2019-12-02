@@ -5,6 +5,10 @@ import glob
 import shutil
 import logging
 import itertools
+import pprint
+
+import functools
+import tempfile
 from multiprocessing.dummy import Pool as ThreadPool
 
 import nuke
@@ -100,13 +104,17 @@ def _copy_file(source_file, target_file):
         # 可以被复制
         if target_file:
             # 需要被复制
+            # 生成文件夹
+            if not os.path.exists(os.path.dirname(target_file)):
+                os.makedirs(os.path.dirname(target_file))
             try:
                 shutil.copyfile(source_file, target_file)
-            except:
+            except Exception, e:
                 # 复制失败
-                return True
-            else:
+                logger.info(e)
                 return False
+            else:
+                return True
         else:
             # 不需要被复制
             return True
@@ -116,21 +124,73 @@ def _copy_file(source_file, target_file):
 
 
 def get_target_copy_path(local_path, **kwargs):
+    """
     # 根据一些信息，获取要复制的目标路径
-    return None
+    # 函数的参数这种形式可以适合partial函数，非关键字参数不适合partial
+    :param local_path:
+    :param kwargs: read,targetDir
+    :return:
+    """
+    if _is_image_on_shared_drive(local_path):
+        # 为true,不需要复制
+        return None
+    if "read" in kwargs:
+        # 提供了read参数，表明函数需要read信息
+        readName = kwargs["read"]
+    # -------------------------------
+    copy_dir = tempfile.gettempdir()
+    if "targetDir" in kwargs:
+        if kwargs["targetDir"] and os.path.isdir(kwargs["targetDir"]):
+            copy_dir = kwargs["targetDir"]
+
+    # fileBaseName = os.path.splitext(os.path.basename(local_path))[0]
+    # ext = os.path.splitext(os.path.basename(local_path))[-1]
+    _data = os.path.basename(local_path).split(".")
+    fileBaseName = _data[0]
+    folders_in_folder = [d for d in os.listdir(copy_dir) if os.path.isdir(d)]
+    # 逻辑为文件夹编号自动提升,文件夹格式为{basename}_{index}
+    baseNameFolder = filter(lambda x: re.match("{}_\d+".format(fileBaseName), x), folders_in_folder)
+    baseNameFolderIndex = map(lambda x: re.match("{}_(\d+)".format(fileBaseName), x).group(1), baseNameFolder)
+    if baseNameFolderIndex:
+        maxIndex = max(baseNameFolderIndex, key=lambda x: int(x))
+    else:
+        maxIndex = None
+    if maxIndex:
+        # 已经有复制过同名文件
+        nextIndex = int(maxIndex) + 1
+    else:
+        # 没有复制过
+        nextIndex = 0
+    targetFolderName = "{}_{}".format(fileBaseName, nextIndex)
+    targetFilePath = os.path.join(copy_dir, targetFolderName, os.path.basename(local_path))
+    return targetFilePath
+
+
+def _copy_in_thread(sourcePath, targetDir=None, read=None):
+    targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
+
+    return _copy_file(sourcePath, targetPath)
 
 
 # --------------------------------------------------
-def main():
+def copy_read_files(targetDir=None):
+    """
+    复制read files到target dir中，默认targetdir为temp目录
+    :param targetDir:
+    :return:
+    """
     # 收集read信息,
     allRead = nuke.allNodes('Read')
     # 按read进行顺序复制
     # 每个read复制过程启用线程
     copy_thread_pool = ThreadPool()
+    results = []
     for read in allRead:
         readName = read.name()
         files = get_read_files(readName)  # 获取复制文件
-        dataList = itertools.starmap(get_target_copy_path, files)  # 获取复制细节.starmap用来解包参数
-        copyResult = copy_thread_pool.map(lambda x: _copy_file(x[0], x[1]), dataList)  # 这一句不应该发生错误，否则报错内容不太好看,执行复制
-        for data, result in zip(dataList, copyResult):
-            logger.info("Read:{}:\n\t{}->{}:{}".format(readName, data[0], data[1], result))
+        # targetFiles = map(functools.partial(get_target_copy_path, targetDir=targetDir, read=readName), files)  # 获取复制细节.starmap用来解包参数
+        copyResult = copy_thread_pool.map_async(functools.partial(_copy_in_thread, targetDir=targetDir, read=readName), files)  # 执行复制.这一句不应该发生错误，否则报错内容不太好看,
+        results.append(copyResult)
+
+        # for file, targetFile, result in itertools.izip(files, targetFiles, copyResult.get()):
+        #     logger.info("Read:{}:\n\t{}->{}:{}".format(readName, file, targetFile, result))
