@@ -5,9 +5,8 @@ import time
 import sys
 
 
-# Manager管理任务
-# 每个任务串行运行（现阶段）
-# 任务内部并发运行
+# 每个job串行运行（现阶段）
+# job内部并发运行
 
 class Worker(threading.Thread):
     def __init__(self, inQueue, outQueue):
@@ -91,22 +90,6 @@ class Job(object):
             output.append(self._output.get())
             # self._output.task_done()
         return output
-
-    # class SerialTaskManager(object):
-
-
-#     # 串行运行task,task使用仅有的quene
-#     def __init__(self):
-#         super(SerialTaskManager, self).__init__()
-#         self.jobs = []
-#
-#
-#     def addJob(self, _Job):
-#         if _Job not in self.jobs:
-#             self.jobs.append(_Job)
-#
-#     def wait(self):
-#         for j in self.
 
 
 if __name__ == "__main__":
