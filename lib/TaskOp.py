@@ -20,7 +20,10 @@ class Worker(threading.Thread):
             task = self.inQueue.get(block=True, timeout=20)  # 接收消息,无需长时间等待
             # 获取了task
             result = task.run()
-            self.inQueue.task_done()  # 完成一个任务
+            self.inQueue.task_done()
+            if self.inQueue.empty():
+                nextJob.set()
+                # 所有task完成，设置执行下一个job
             self.outQueue.put((task, result))
             # sys.stdout.write("work done:{}->{}\n".format(task, result))
             # sys.stdout.flush()
@@ -80,12 +83,15 @@ class Job(object):
         # while not self._input.empty():
         #     time.sleep(0.1)
         self._input.join()
+        self._isFinished = True
         output = []
         while self._output.qsize() > 0:
             output.append(self._output.get())
             # self._output.task_done()
-        self._isFinished = True
         return output
+
+
+nextJob = threading.Event()
 
 
 class SerialProducer(threading.Thread):
@@ -96,18 +102,27 @@ class SerialProducer(threading.Thread):
         self._containter = queue
 
     def run(self):
+        # 容器空了，并不表示任务完成了
+        # 只有确定任务完成了，才可以进行下一步
         jobDetails = deque(self._jobDetails)
         while True:
             if jobDetails:
                 # 数据没有消耗完
-                if self._containter.empty():
-                    # 容器空了，需要添加
+                if len(jobDetails) == len(self._jobDetails):
                     jobDetail = jobDetails.popleft()
-                    func, args_kwargs_iter = jobDetail
-                    for a in args_kwargs_iter:
-                        args, kwargs = a
-                        task = Task(func, *args, **kwargs)
-                        self._containter.put(task)
+                else:
+                    if nextJob.is_set():
+                        # 只有再event设置的情况下进行下一步
+                        jobDetail = jobDetails.popleft()
+                    else:
+                        continue
+                func, args_kwargs_iter = jobDetail
+                for a in args_kwargs_iter:
+                    args, kwargs = a
+                    task = Task(func, *args, **kwargs)
+                    self._containter.put(task)
+                nextJob.clear()
+                print "next job begin"
             else:
                 # 消耗完了
                 break
