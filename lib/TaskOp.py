@@ -2,7 +2,7 @@
 import threading
 import Queue
 import time
-import sys
+from collections import deque
 
 
 # 每个job串行运行（现阶段）
@@ -30,6 +30,7 @@ class Worker(threading.Thread):
 
 
 class Task(object):
+    # worker 和task时相对应的
     def __init__(self, func, *args, **kwargs):
         super(Task, self).__init__()
         self._func = func
@@ -43,38 +44,33 @@ class Task(object):
             result = e
         return result
 
+    def __repr__(self):
+        return "<Task at {}>[{}({},{})]".format(id(self), self._func, self._args, self._kwarg)
 
+
+# -----------------------------------------
 class Job(object):
-    def __init__(self, func, argsIter):
+    def __init__(self):
         super(Job, self).__init__()
-
-        # data
-        self._func = func
-        self._data = argsIter  # 可迭代 .元素为(arg,kwarg)
-        self._result = []
-
         # thread
         self._input = Queue.Queue()
         self._output = Queue.Queue()
         self.numWorker = 6
-
         # status
-        self._isStart = False
         self._isFinished = False
 
-    @property
-    def isStart(self):
-        return self._isStart
+        # data
+        self._result = []
 
     @property
     def isFinished(self):
         return self._isFinished
 
+    @property
+    def input(self):
+        return self._input
+
     def run(self):
-        # 数据
-        for data in self._data:
-            arg, kwarg = data
-            self._input.put_nowait(Task(self._func, *arg, **kwarg))
         # worker
         for n in range(self.numWorker):
             w = Worker(self._input, self._output)
@@ -88,8 +84,56 @@ class Job(object):
         while self._output.qsize() > 0:
             output.append(self._output.get())
             # self._output.task_done()
-        self._isFinished=True
+        self._isFinished = True
         return output
+
+
+class SerialProducer(threading.Thread):
+    def __init__(self, jobDetails, queue):
+        super(SerialProducer, self).__init__()
+        # jobDetails = [(func,iters),...]
+        self._jobDetails = jobDetails
+        self._containter = queue
+
+    def run(self):
+        jobDetails = deque(self._jobDetails)
+        while True:
+            if jobDetails:
+                # 数据没有消耗完
+                print "begin put data"
+                if self._containter.empty():
+                    # 容器空了，需要添加
+                    print "it is ok to put data"
+                    jobDetail = jobDetails.popleft()
+                    func, args_kwargs_iter = jobDetail
+                    for a in args_kwargs_iter:
+                        args, kwargs = a
+                        task = Task(func, *args, **kwargs)
+                        self._containter.put(task)
+                        print "put:{}".format(task)
+                else:
+                    print "it is not time to put data"
+            else:
+                # 消耗完了
+                break
+
+
+class SerialJobManager(object):
+    def __init__(self):
+        super(SerialJobManager, self).__init__()
+        self.mainJob = Job()
+        self.jobDetails = []
+
+    def addJob(self, jobDetail):
+        self.jobDetails.append(jobDetail)
+
+    def execute(self):
+        # 需要生产线程
+        generate_data = SerialProducer(self.jobDetails, self.mainJob.input)
+        generate_data.start()
+
+        # 开始执行任务
+        print self.mainJob.run()
 
 
 if __name__ == "__main__":
@@ -98,11 +142,19 @@ if __name__ == "__main__":
         return a + b
 
 
-    data = [((1, 2), {}),
-            ((3, "2"), {}),
-            ((1, 3), {}),
-            ((1, 4), {})
-            ]
-    job = Job(sum, data)
-    result = job.run()
-    print result
+    jobA_data = [((1, 2), {}),
+                 ((3, "2"), {}),
+                 ((1, 3), {}),
+                 ((1, 4), {})
+                 ]
+    jobB_data = [((1, 2), {}),
+                 ((3, "2"), {}),
+                 ((1, 3), {}),
+                 ((1, 4), {}),
+                 ((1, 2), {})
+                 ]
+
+    m = SerialJobManager()
+    m.addJob((sum, jobA_data))
+    m.addJob((sum, jobB_data))
+    m.execute()
