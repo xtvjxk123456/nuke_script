@@ -19,6 +19,8 @@ import TaskOp
 logger = logging.getLogger("Nuke")
 logger.setLevel(logging.DEBUG)
 
+global_lock = threading.Lock()
+
 
 # -------------------------------------------------
 def _check_read_file_resolve_type(read):
@@ -169,10 +171,10 @@ def get_target_copy_path(local_path, **kwargs):
 
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
-    with threading.Lock():
+    with global_lock:
         targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
-    print  read,sourcePath, targetPath,
-    return _copy_file(sourcePath, targetPath)
+        result = _copy_file(sourcePath, targetPath)
+    return result
 
 
 # --------------------------------------------------
@@ -186,16 +188,11 @@ def copy_read_files(targetDir=None):
     allRead = nuke.allNodes('Read')
     # 按read进行顺序复制
     # 每个read复制过程启用线程
-    results = {}
+    _function_args = []
     for read in allRead:
         readName = read.name()
-        files = get_read_files(readName)  # 获取复制文件
-        _function_args = map(lambda x: ((x,), {"targetDir": targetDir, "read": readName}), files)
-        copyJob = TaskOp.Job(_copy_in_thread, _function_args)
-        result = copyJob.run()
-        while not copyJob.isFinished:
-            time.sleep(0.1)
+        _files = get_read_files(readName)
+        _function_args.extend(map(lambda x: ((x,), {"targetDir": targetDir, "read": readName}), _files))
 
-        results[readName] = result
-
-    # pprint.pprint(results)
+    copyJob = TaskOp.Job(_copy_in_thread, _function_args)
+    result = copyJob.run()
