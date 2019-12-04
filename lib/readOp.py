@@ -6,13 +6,15 @@ import shutil
 import logging
 import itertools
 import pprint
+import time
 
 import functools
+import threading
 import tempfile
-from multiprocessing.dummy import Pool as ThreadPool
 
 import nuke
 from netApi import get_connection
+import TaskOp
 
 logger = logging.getLogger("Nuke")
 logger.setLevel(logging.DEBUG)
@@ -167,8 +169,9 @@ def get_target_copy_path(local_path, **kwargs):
 
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
-    targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
-
+    with threading.Lock():
+        targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
+    print  read,sourcePath, targetPath,
     return _copy_file(sourcePath, targetPath)
 
 
@@ -183,14 +186,16 @@ def copy_read_files(targetDir=None):
     allRead = nuke.allNodes('Read')
     # 按read进行顺序复制
     # 每个read复制过程启用线程
-    copy_thread_pool = ThreadPool()
-    results = []
+    results = {}
     for read in allRead:
         readName = read.name()
         files = get_read_files(readName)  # 获取复制文件
-        # targetFiles = map(functools.partial(get_target_copy_path, targetDir=targetDir, read=readName), files)  # 获取复制细节.starmap用来解包参数
-        copyResult = copy_thread_pool.map_async(functools.partial(_copy_in_thread, targetDir=targetDir, read=readName), files)  # 执行复制.这一句不应该发生错误，否则报错内容不太好看,
-        results.append(copyResult)
+        _function_args = map(lambda x: ((x,), {"targetDir": targetDir, "read": readName}), files)
+        copyJob = TaskOp.Job(_copy_in_thread, _function_args)
+        result = copyJob.run()
+        while not copyJob.isFinished:
+            time.sleep(0.1)
 
-        # for file, targetFile, result in itertools.izip(files, targetFiles, copyResult.get()):
-        #     logger.info("Read:{}:\n\t{}->{}:{}".format(readName, file, targetFile, result))
+        results[readName] = result
+
+    # pprint.pprint(results)

@@ -22,9 +22,8 @@ class Worker(threading.Thread):
             result = task.run()
             self.inQueue.task_done()  # 完成一个任务
             self.outQueue.put((task, result))
-            # print "work done:{}->{}".format(task, result)
-            sys.stdout.write("work done:{}->{}\n".format(task, result))
-            sys.stdout.flush()
+            # sys.stdout.write("work done:{}->{}\n".format(task, result))
+            # sys.stdout.flush()
             # res = self.queue.qsize()  # 判断消息队列大小
             # if res > 0:
             #     print "still has job to do"
@@ -89,6 +88,7 @@ class Job(object):
         while self._output.qsize() > 0:
             output.append(self._output.get())
             # self._output.task_done()
+        self._isFinished=True
         return output
 
 
