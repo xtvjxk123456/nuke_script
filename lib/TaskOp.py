@@ -14,17 +14,11 @@ class Worker(threading.Thread):
         super(Worker, self).__init__()
         self.inQueue = inQueue
         self.outQueue = outQueue
-        self.thread_stop = False
 
     def run(self):
         # 线程不持续运行时，会自动退出
-        while not self.thread_stop:
-            try:
-                task = self.inQueue.get(block=True, timeout=20)  # 接收消息,无需长时间等待
-            except Queue.Empty:
-                # 序列为空
-                self.thread_stop = True
-                break
+        while not self.inQueue.empty():
+            task = self.inQueue.get(block=True, timeout=20)  # 接收消息,无需长时间等待
             # 获取了task
             result = task.run()
             self.inQueue.task_done()  # 完成一个任务
@@ -35,9 +29,6 @@ class Worker(threading.Thread):
             # res = self.queue.qsize()  # 判断消息队列大小
             # if res > 0:
             #     print "still has job to do"
-
-    def stop(self):
-        self.thread_stop = True
 
 
 class Task(object):
@@ -120,7 +111,7 @@ class Job(object):
 
 if __name__ == "__main__":
     def sum(a, b):
-        time.sleep(1)
+        time.sleep(2)
         return a + b
 
 
