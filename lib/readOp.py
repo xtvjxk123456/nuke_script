@@ -171,9 +171,10 @@ def get_target_copy_path(local_path, **kwargs):
 
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
-    with global_lock:
-        targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
-        result = _copy_file(sourcePath, targetPath)
+    targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
+    if targetPath:
+        print "{}:\n\t{}\n\t\t{}".format(read, sourcePath, targetPath)
+    result = _copy_file(sourcePath, targetPath)
     return result
 
 
@@ -188,11 +189,12 @@ def copy_read_files(targetDir=None):
     allRead = nuke.allNodes('Read')
     # 按read进行顺序复制
     # 每个read复制过程启用线程
-    _function_args = []
+    jobManager = TaskOp.SerialJobManager()
     for read in allRead:
         readName = read.name()
         _files = get_read_files(readName)
-        _function_args.extend(map(lambda x: ((x,), {"targetDir": targetDir, "read": readName}), _files))
+        jobDetail = [_copy_in_thread, [((f,), {"targetDir": targetDir, "read": readName}) for f in _files]]
+        # jobDetail = [func,[(args,kwarg),...]]
+        jobManager.addJob(jobDetail)
 
-    copyJob = TaskOp.Job(_copy_in_thread, _function_args)
-    result = copyJob.run()
+    jobManager.execute()

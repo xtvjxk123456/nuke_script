@@ -100,19 +100,14 @@ class SerialProducer(threading.Thread):
         while True:
             if jobDetails:
                 # 数据没有消耗完
-                print "begin put data"
                 if self._containter.empty():
                     # 容器空了，需要添加
-                    print "it is ok to put data"
                     jobDetail = jobDetails.popleft()
                     func, args_kwargs_iter = jobDetail
                     for a in args_kwargs_iter:
                         args, kwargs = a
                         task = Task(func, *args, **kwargs)
                         self._containter.put(task)
-                        print "put:{}".format(task)
-                else:
-                    print "it is not time to put data"
             else:
                 # 消耗完了
                 break
@@ -133,7 +128,7 @@ class SerialJobManager(object):
         generate_data.start()
 
         # 开始执行任务
-        print self.mainJob.run()
+        self.mainJob.run()
 
 
 if __name__ == "__main__":
