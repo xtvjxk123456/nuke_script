@@ -127,33 +127,15 @@ def _copy_file(source_file, target_file):
         return False
 
 
-def get_target_copy_path(local_path, **kwargs):
-    """
-    # 根据一些信息，获取要复制的目标路径
-    # 函数的参数这种形式可以适合partial函数，非关键字参数不适合partial
-    :param local_path:
-    :param kwargs: read,targetDir
-    :return:
-    """
-    if _is_image_on_shared_drive(local_path):
-        # 为true,不需要复制
-        return None
-    if "read" in kwargs:
-        # 提供了read参数，表明函数需要read信息
-        readName = kwargs["read"]
-    # -------------------------------
-    copy_dir = tempfile.gettempdir()
-    if "targetDir" in kwargs:
-        if kwargs["targetDir"] and os.path.isdir(kwargs["targetDir"]):
-            copy_dir = kwargs["targetDir"]
-
-    # fileBaseName = os.path.splitext(os.path.basename(local_path))[0]
-    # ext = os.path.splitext(os.path.basename(local_path))[-1]
-    _data = os.path.basename(local_path).split(".")
+# ----------------------------------------------------------
+# 线程内的函数
+def _get_target_copy_folder(sourcePath, targetDir):
+    # 当前状态通过sourcepath推测的文件夹名字
+    _data = os.path.basename(sourcePath).split(".")
     fileBaseName = _data[0]
     folders_in_folder_names = []
-    for d in os.listdir(copy_dir):
-        if os.path.isdir(os.path.join(copy_dir, d)):
+    for d in os.listdir(targetDir):
+        if os.path.isdir(os.path.join(targetDir, d)):
             folders_in_folder_names.append(d)
     # 逻辑为文件夹编号自动提升,文件夹格式为{basename}_{index}
     baseNameFolder = filter(lambda x: re.match("{}_\d+".format(fileBaseName), x), folders_in_folder_names)
@@ -169,15 +151,37 @@ def get_target_copy_path(local_path, **kwargs):
         # 没有复制过
         nextIndex = 0
     targetFolderName = "{}_{}".format(fileBaseName, nextIndex)
-    targetFilePath = os.path.join(copy_dir, targetFolderName, os.path.basename(local_path))
-    return targetFilePath
+    return targetFolderName
+
+
+currentRead = None
+targetStoreDir = None
 
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
-    targetPath = get_target_copy_path(sourcePath, targetDir=targetDir, read=read)
-    if targetPath:
-        print "{}:\n\t{}\n\t\t{}".format(read, sourcePath, targetPath)
-    result = _copy_file(sourcePath, targetPath)
+    with global_lock:
+        global currentRead, targetStoreDir
+        if not currentRead:
+            # 未被记录
+            currentRead = read
+        if not targetStoreDir:
+            # 未被记录
+            # ---------------------------------------
+            guessFolderName = _get_target_copy_folder(sourcePath, targetDir)
+            # -------------------------------------------
+            os.makedirs(os.path.join(targetDir, guessFolderName))
+            targetStoreDir = guessFolderName
+            # -------------------------------------------
+        if currentRead == read:
+            # 在read任务中
+            pass
+        else:
+            # 刷新currentRead和target
+            currentRead = read
+            targetStoreDir = _get_target_copy_folder(sourcePath, targetDir)
+
+        targetPath = os.path.join(targetDir, targetStoreDir, os.path.basename(sourcePath))
+        result = _copy_file(sourcePath, targetPath)
     return result
 
 
