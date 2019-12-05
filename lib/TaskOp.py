@@ -2,6 +2,7 @@
 import threading
 import Queue
 import time
+import sys
 from collections import deque
 
 
@@ -48,7 +49,7 @@ class Task(object):
         return result
 
     def __repr__(self):
-        return "<Task at {}>[{}({},{})]".format(id(self), self._func, self._args, self._kwarg)
+        return "<Task at {}>[{}({},{})]".format(id(self), self._func.func_name, self._args, self._kwarg)
 
 
 # -----------------------------------------
@@ -122,7 +123,9 @@ class SerialProducer(threading.Thread):
                     task = Task(func, *args, **kwargs)
                     self._containter.put(task)
                 nextJob.clear()
-                print "{:-^30}".format("next job")
+                # --------------------------
+                sys.stdout.write("{:-^30}\n".format("next job"))
+                sys.stdout.flush()
             else:
                 # 消耗完了
                 break
@@ -169,3 +172,4 @@ if __name__ == "__main__":
     m.addJob((sum, jobA_data))
     m.addJob((sum, jobB_data))
     result = m.execute()
+    print result
