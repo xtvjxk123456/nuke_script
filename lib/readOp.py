@@ -159,6 +159,9 @@ targetStoreDir = None
 
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
+    if _is_image_on_shared_drive(sourcePath):
+        return True
+
     with global_lock:
         global currentRead, targetStoreDir
         if not currentRead:
