@@ -151,9 +151,12 @@ def get_target_copy_path(local_path, **kwargs):
     # ext = os.path.splitext(os.path.basename(local_path))[-1]
     _data = os.path.basename(local_path).split(".")
     fileBaseName = _data[0]
-    folders_in_folder = [d for d in os.listdir(copy_dir) if os.path.isdir(d)]
+    folders_in_folder_names = []
+    for d in os.listdir(copy_dir):
+        if os.path.isdir(os.path.join(copy_dir, d)):
+            folders_in_folder_names.append(d)
     # 逻辑为文件夹编号自动提升,文件夹格式为{basename}_{index}
-    baseNameFolder = filter(lambda x: re.match("{}_\d+".format(fileBaseName), x), folders_in_folder)
+    baseNameFolder = filter(lambda x: re.match("{}_\d+".format(fileBaseName), x), folders_in_folder_names)
     baseNameFolderIndex = map(lambda x: re.match("{}_(\d+)".format(fileBaseName), x).group(1), baseNameFolder)
     if baseNameFolderIndex:
         maxIndex = max(baseNameFolderIndex, key=lambda x: int(x))
