@@ -122,7 +122,7 @@ class SerialProducer(threading.Thread):
                     task = Task(func, *args, **kwargs)
                     self._containter.put(task)
                 nextJob.clear()
-                print "next job begin"
+                print "{:-^30}".format("next job")
             else:
                 # 消耗完了
                 break
@@ -143,7 +143,8 @@ class SerialJobManager(object):
         generate_data.start()
 
         # 开始执行任务
-        self.mainJob.run()
+        result = self.mainJob.run()
+        return result
 
 
 if __name__ == "__main__":
@@ -167,4 +168,4 @@ if __name__ == "__main__":
     m = SerialJobManager()
     m.addJob((sum, jobA_data))
     m.addJob((sum, jobB_data))
-    m.execute()
+    result = m.execute()
