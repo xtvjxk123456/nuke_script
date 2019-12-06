@@ -160,7 +160,7 @@ targetStoreDir = None
 
 def _copy_in_thread(sourcePath, targetDir=None, read=None):
     if _is_image_on_shared_drive(sourcePath):
-        return True
+        return sourcePath
 
     with global_lock:
         global currentRead, targetStoreDir
@@ -184,7 +184,11 @@ def _copy_in_thread(sourcePath, targetDir=None, read=None):
             targetStoreDir = _get_target_copy_folder(sourcePath, targetDir)
 
         targetPath = os.path.join(targetDir, targetStoreDir, os.path.basename(sourcePath))
-        result = _copy_file(sourcePath, targetPath)
+        status = _copy_file(sourcePath, targetPath)
+        if status:
+            result = targetPath
+        else:
+            result = None
     return result
 
 
@@ -207,4 +211,5 @@ def copy_read_files(targetDir=None):
         # jobDetail = [func,[(args,kwarg),...]]
         jobManager.addJob(jobDetail)
 
-    jobManager.execute()
+    result = jobManager.execute()
+    return result
