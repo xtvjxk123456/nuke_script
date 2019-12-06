@@ -211,5 +211,16 @@ def copy_read_files(targetDir=None):
         # jobDetail = [func,[(args,kwarg),...]]
         jobManager.addJob(jobDetail)
 
-    result = jobManager.execute()
-    return result
+    _result = jobManager.execute()
+    # 筛选结果，返回复制的路径
+    resultDetail = {}
+    for result in _result:
+        task, resultPath = result
+        sourcePath,= task._args # 单个arg，只能单个进行unpack
+        read = task._kwarg.get("read")
+        if read not in resultDetail:
+            resultDetail[read] = []
+        resultDetail[read].append((sourcePath, resultPath))
+    return resultDetail
+
+
