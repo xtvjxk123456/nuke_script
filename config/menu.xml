@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<Menu label="file" tooltip="">
+    <Action label="test" command="" tooltip="">
+    </Action>
+    <Separator label="" collapsible="0" collapsed="0">
+    </Separator>
+    <Action label="test2" command="2" tooltip="">
+    </Action>
+    <Separator label="" collapsible="0" collapsed="0">
+    </Separator>
+    <Menu label="test" tooltip="">
+        <Separator label="" collapsible="0" collapsed="0">
+        </Separator>
+        <Action label="test2" command="2" tooltip="">
+        </Action>
+        <Action label="test2" command="2" tooltip="">
+        </Action>
+        <Separator label="" collapsible="0" collapsed="0">
+        </Separator>
+    </Menu>
+</Menu>
+
